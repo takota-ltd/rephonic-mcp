@@ -4,7 +4,7 @@ Give AI agents and LLMs access to podcast data from [Rephonic](https://rephonic.
 
 This is a remote Model Context Protocol (MCP) server that connects AI assistants like Claude, ChatGPT, and Cursor to the [Rephonic API](https://rephonic.com/developers).
 
-## What can your AI agent do with the Rephonic API?
+## Ideas and Use Cases
 
 - **Read, summarise and analyse transcripts** — grab a full-text transcript for almost any podcast episode
 - **Search and discover podcasts** — find shows by topic, category, or audience fit
