@@ -73,7 +73,8 @@ Go to **Settings** → **MCP** → **Add new MCP server**. Set type to **URL** a
 
 ---
 
-## Development
+<details>
+<summary><h2>Development</h2></summary>
 
 If you want to fork or customize this MCP server for your own needs, here is how you can run or deploy it.
 
@@ -109,7 +110,10 @@ After changing `wrangler.jsonc`:
 npm run cf-typegen
 ```
 
-## Deployment
+</details>
+
+<details>
+<summary><h2>Deployment</h2></summary>
 
 ### First-time setup
 
@@ -138,3 +142,5 @@ npm run cf-typegen
 ```bash
 npm run deploy
 ```
+
+</details>
