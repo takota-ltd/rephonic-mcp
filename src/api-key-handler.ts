@@ -1,154 +1,165 @@
+import type {
+  AuthRequest,
+  OAuthHelpers,
+} from "@cloudflare/workers-oauth-provider";
 import { env } from "cloudflare:workers";
-import type { AuthRequest, OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";
 import {
-	addApprovedClient,
-	bindStateToSession,
-	createOAuthState,
-	generateCSRFProtection,
-	isClientApproved,
-	OAuthError,
-	validateCSRFToken,
-	validateOAuthState,
+  addApprovedClient,
+  bindStateToSession,
+  createOAuthState,
+  generateCSRFProtection,
+  isClientApproved,
+  OAuthError,
+  validateCSRFToken,
+  validateOAuthState,
 } from "./workers-oauth-utils";
 
 const app = new Hono<{ Bindings: Env & { OAUTH_PROVIDER: OAuthHelpers } }>();
 
 app.get("/authorize", async (c) => {
-	const oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
-	const { clientId } = oauthReqInfo;
-	if (!clientId) {
-		return c.text("Invalid request", 400);
-	}
+  const oauthReqInfo = await c.env.OAUTH_PROVIDER.parseAuthRequest(c.req.raw);
+  const { clientId } = oauthReqInfo;
+  if (!clientId) {
+    return c.text("Invalid request", 400);
+  }
 
-	// If the client was already approved, skip straight to the API key form
-	if (await isClientApproved(c.req.raw, clientId, env.COOKIE_ENCRYPTION_KEY)) {
-		const { stateToken } = await createOAuthState(oauthReqInfo, c.env.OAUTH_KV);
-		const { setCookie: sessionBindingCookie } = await bindStateToSession(stateToken);
-		return renderApiKeyForm(stateToken, { "Set-Cookie": sessionBindingCookie });
-	}
+  // If the client was already approved, skip straight to the API key form
+  if (await isClientApproved(c.req.raw, clientId, env.COOKIE_ENCRYPTION_KEY)) {
+    const { stateToken } = await createOAuthState(oauthReqInfo, c.env.OAUTH_KV);
+    const { setCookie: sessionBindingCookie } =
+      await bindStateToSession(stateToken);
+    return renderApiKeyForm(stateToken, { "Set-Cookie": sessionBindingCookie });
+  }
 
-	const { token: csrfToken, setCookie } = generateCSRFProtection();
+  const { token: csrfToken, setCookie } = generateCSRFProtection();
 
-	return renderApprovalPage(c.req.raw, {
-		client: await c.env.OAUTH_PROVIDER.lookupClient(clientId),
-		csrfToken,
-		setCookie,
-		state: { oauthReqInfo },
-	});
+  return renderApprovalPage(c.req.raw, {
+    client: await c.env.OAUTH_PROVIDER.lookupClient(clientId),
+    csrfToken,
+    setCookie,
+    state: { oauthReqInfo },
+  });
 });
 
 // Step 1: User approves the MCP client → show the API key form
 app.post("/authorize", async (c) => {
-	try {
-		const formData = await c.req.raw.formData();
-		validateCSRFToken(formData, c.req.raw);
+  try {
+    const formData = await c.req.raw.formData();
+    validateCSRFToken(formData, c.req.raw);
 
-		const encodedState = formData.get("state");
-		if (!encodedState || typeof encodedState !== "string") {
-			return c.text("Missing state in form data", 400);
-		}
+    const encodedState = formData.get("state");
+    if (!encodedState || typeof encodedState !== "string") {
+      return c.text("Missing state in form data", 400);
+    }
 
-		let state: { oauthReqInfo?: AuthRequest };
-		try {
-			state = JSON.parse(atob(encodedState));
-		} catch (_e) {
-			return c.text("Invalid state data", 400);
-		}
+    let state: { oauthReqInfo?: AuthRequest };
+    try {
+      state = JSON.parse(atob(encodedState));
+    } catch (_e) {
+      return c.text("Invalid state data", 400);
+    }
 
-		if (!state.oauthReqInfo || !state.oauthReqInfo.clientId) {
-			return c.text("Invalid request", 400);
-		}
+    if (!state.oauthReqInfo || !state.oauthReqInfo.clientId) {
+      return c.text("Invalid request", 400);
+    }
 
-		const approvedClientCookie = await addApprovedClient(
-			c.req.raw,
-			state.oauthReqInfo.clientId,
-			c.env.COOKIE_ENCRYPTION_KEY,
-		);
+    const approvedClientCookie = await addApprovedClient(
+      c.req.raw,
+      state.oauthReqInfo.clientId,
+      c.env.COOKIE_ENCRYPTION_KEY,
+    );
 
-		const { stateToken } = await createOAuthState(state.oauthReqInfo, c.env.OAUTH_KV);
-		const { setCookie: sessionBindingCookie } = await bindStateToSession(stateToken);
+    const { stateToken } = await createOAuthState(
+      state.oauthReqInfo,
+      c.env.OAUTH_KV,
+    );
+    const { setCookie: sessionBindingCookie } =
+      await bindStateToSession(stateToken);
 
-		const headers = new Headers();
-		headers.append("Set-Cookie", approvedClientCookie);
-		headers.append("Set-Cookie", sessionBindingCookie);
+    const headers = new Headers();
+    headers.append("Set-Cookie", approvedClientCookie);
+    headers.append("Set-Cookie", sessionBindingCookie);
 
-		return renderApiKeyForm(stateToken, Object.fromEntries(headers));
-	} catch (error: any) {
-		if (error instanceof OAuthError) {
-			return error.toResponse();
-		}
-		return c.text(`Internal server error: ${error.message}`, 500);
-	}
+    return renderApiKeyForm(stateToken, Object.fromEntries(headers));
+  } catch (error: any) {
+    if (error instanceof OAuthError) {
+      return error.toResponse();
+    }
+    return c.text(`Internal server error: ${error.message}`, 500);
+  }
 });
 
 // Step 2: User submits their Rephonic API key → complete the OAuth flow
 app.post("/submit-api-key", async (c) => {
-	try {
-		const formData = await c.req.raw.formData();
-		const apiKey = formData.get("api_key");
-		const stateToken = formData.get("state");
+  try {
+    const formData = await c.req.raw.formData();
+    const apiKey = formData.get("api_key");
+    const stateToken = formData.get("state");
 
-		if (!apiKey || typeof apiKey !== "string" || !apiKey.trim()) {
-			return c.text("API key is required", 400);
-		}
+    if (!apiKey || typeof apiKey !== "string" || !apiKey.trim()) {
+      return c.text("API key is required", 400);
+    }
 
-		if (!stateToken || typeof stateToken !== "string") {
-			return c.text("Missing state", 400);
-		}
+    if (!stateToken || typeof stateToken !== "string") {
+      return c.text("Missing state", 400);
+    }
 
-		// Validate the state token and get the original OAuth request
-		// We need to reconstruct a request with the state as a query param
-		const fakeUrl = new URL(c.req.url);
-		fakeUrl.searchParams.set("state", stateToken);
-		const fakeRequest = new Request(fakeUrl.toString(), {
-			headers: c.req.raw.headers,
-		});
+    // Validate the state token and get the original OAuth request
+    // We need to reconstruct a request with the state as a query param
+    const fakeUrl = new URL(c.req.url);
+    fakeUrl.searchParams.set("state", stateToken);
+    const fakeRequest = new Request(fakeUrl.toString(), {
+      headers: c.req.raw.headers,
+    });
 
-		let oauthReqInfo: AuthRequest;
-		let clearSessionCookie: string;
+    let oauthReqInfo: AuthRequest;
+    let clearSessionCookie: string;
 
-		try {
-			const result = await validateOAuthState(fakeRequest, c.env.OAUTH_KV);
-			oauthReqInfo = result.oauthReqInfo;
-			clearSessionCookie = result.clearCookie;
-		} catch (error: any) {
-			if (error instanceof OAuthError) {
-				return error.toResponse();
-			}
-			return c.text("Internal server error", 500);
-		}
+    try {
+      const result = await validateOAuthState(fakeRequest, c.env.OAUTH_KV);
+      oauthReqInfo = result.oauthReqInfo;
+      clearSessionCookie = result.clearCookie;
+    } catch (error: any) {
+      if (error instanceof OAuthError) {
+        return error.toResponse();
+      }
+      return c.text("Internal server error", 500);
+    }
 
-		if (!oauthReqInfo.clientId) {
-			return c.text("Invalid OAuth request data", 400);
-		}
+    if (!oauthReqInfo.clientId) {
+      return c.text("Invalid OAuth request data", 400);
+    }
 
-		// Complete the authorization with the API key stored in props
-		const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
-			metadata: {
-				label: "Rephonic API Key User",
-			},
-			props: {
-				apiKey: apiKey.trim(),
-			},
-			request: oauthReqInfo,
-			scope: oauthReqInfo.scope,
-			userId: "api-key-user",
-		});
+    // Complete the authorization with the API key stored in props
+    const { redirectTo } = await c.env.OAUTH_PROVIDER.completeAuthorization({
+      metadata: {
+        label: "Rephonic API Key User",
+      },
+      props: {
+        apiKey: apiKey.trim(),
+      },
+      request: oauthReqInfo,
+      scope: oauthReqInfo.scope,
+      userId: "api-key-user",
+    });
 
-		const headers = new Headers({ Location: redirectTo });
-		if (clearSessionCookie) {
-			headers.set("Set-Cookie", clearSessionCookie);
-		}
+    const headers = new Headers({ Location: redirectTo });
+    if (clearSessionCookie) {
+      headers.set("Set-Cookie", clearSessionCookie);
+    }
 
-		return new Response(null, { status: 302, headers });
-	} catch (error: any) {
-		return c.text(`Internal server error: ${error.message}`, 500);
-	}
+    return new Response(null, { status: 302, headers });
+  } catch (error: any) {
+    return c.text(`Internal server error: ${error.message}`, 500);
+  }
 });
 
-function renderApiKeyForm(stateToken: string, extraHeaders: Record<string, string> = {}): Response {
-	const html = `<!DOCTYPE html>
+function renderApiKeyForm(
+  stateToken: string,
+  extraHeaders: Record<string, string> = {},
+): Response {
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
@@ -234,7 +245,7 @@ function renderApiKeyForm(stateToken: string, extraHeaders: Record<string, strin
 	<div class="container">
 		<div class="card">
 			<h1>Rephonic MCP Server</h1>
-			<p>Enter your Rephonic API key to connect. You can find it on your account page.</p>
+			<p>Enter your Rephonic API key to connect. You can find it on your <a href="https://rephonic.com/account/settings">account page</a>.</p>
 			<form method="post" action="/submit-api-key">
 				<input type="hidden" name="state" value="${stateToken}">
 				<label for="api_key">API Key</label>
@@ -249,30 +260,30 @@ function renderApiKeyForm(stateToken: string, extraHeaders: Record<string, strin
 </body>
 </html>`;
 
-	return new Response(html, {
-		headers: {
-			"Content-Type": "text/html; charset=utf-8",
-			"Content-Security-Policy": "frame-ancestors 'none'",
-			"X-Frame-Options": "DENY",
-			...extraHeaders,
-		},
-	});
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Security-Policy": "frame-ancestors 'none'",
+      "X-Frame-Options": "DENY",
+      ...extraHeaders,
+    },
+  });
 }
 
 function renderApprovalPage(
-	request: Request,
-	options: {
-		client: any;
-		csrfToken: string;
-		setCookie: string;
-		state: Record<string, any>;
-	},
+  request: Request,
+  options: {
+    client: any;
+    csrfToken: string;
+    setCookie: string;
+    state: Record<string, any>;
+  },
 ): Response {
-	const { client, csrfToken, setCookie, state } = options;
-	const encodedState = btoa(JSON.stringify(state));
-	const clientName = client?.clientName || "An MCP Client";
+  const { client, csrfToken, setCookie, state } = options;
+  const encodedState = btoa(JSON.stringify(state));
+  const clientName = client?.clientName || "An MCP Client";
 
-	const html = `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
@@ -323,7 +334,7 @@ function renderApprovalPage(
 	<div class="container">
 		<div class="card">
 			<h1>Rephonic MCP Server</h1>
-			<p><strong>${clientName}</strong> is requesting access to your Rephonic data.</p>
+			<p><strong>${clientName}</strong> is requesting access to your <a href="https://rephonic.com/developers">Rephonic API</a> subscription</a>.</p>
 			<form method="post" action="${new URL(request.url).pathname}">
 				<input type="hidden" name="state" value="${encodedState}">
 				<input type="hidden" name="csrf_token" value="${csrfToken}">
@@ -337,14 +348,14 @@ function renderApprovalPage(
 </body>
 </html>`;
 
-	return new Response(html, {
-		headers: {
-			"Content-Type": "text/html; charset=utf-8",
-			"Content-Security-Policy": "frame-ancestors 'none'",
-			"Set-Cookie": setCookie,
-			"X-Frame-Options": "DENY",
-		},
-	});
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Security-Policy": "frame-ancestors 'none'",
+      "Set-Cookie": setCookie,
+      "X-Frame-Options": "DENY",
+    },
+  });
 }
 
 export { app as ApiKeyHandler };

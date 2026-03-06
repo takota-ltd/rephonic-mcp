@@ -41,11 +41,24 @@ export class MyMCP extends McpAgent<Env, Record<string, never>, Props> {
 	}
 }
 
-export default new OAuthProvider({
-	apiHandler: MyMCP.serve("/"),
-	apiRoute: "/",
+const provider = new OAuthProvider({
+	apiHandler: MyMCP.serve("/mcp"),
+	apiRoute: "/mcp",
 	authorizeEndpoint: "/authorize",
 	clientRegistrationEndpoint: "/register",
 	defaultHandler: ApiKeyHandler as any,
 	tokenEndpoint: "/token",
 });
+
+// Wrap the provider so users can connect with just https://mcp.rephonic.com
+// without apiRoute "/" catching /authorize and /submit-api-key
+export default {
+	fetch(request: Request, env: Env, ctx: ExecutionContext) {
+		const url = new URL(request.url);
+		if (url.pathname === "/") {
+			const rewritten = new Request(new URL("/mcp", url.origin).toString(), request);
+			return provider.fetch(rewritten, env, ctx);
+		}
+		return provider.fetch(request, env, ctx);
+	},
+};
