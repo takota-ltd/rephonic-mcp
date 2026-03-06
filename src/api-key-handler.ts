@@ -105,6 +105,14 @@ app.post("/submit-api-key", async (c) => {
       return c.text("Missing state", 400);
     }
 
+    // Verify the API key works before completing the OAuth flow
+    const quotaResp = await fetch("https://api.rephonic.com/api/accounts/quota/", {
+      headers: { "X-Rephonic-Api-Key": apiKey.trim() },
+    });
+    if (!quotaResp.ok) {
+      return renderApiKeyForm(stateToken, {}, "Invalid API key. Please check your key and try again.");
+    }
+
     // Validate the state token and get the original OAuth request
     // We need to reconstruct a request with the state as a query param
     const fakeUrl = new URL(c.req.url);
@@ -158,6 +166,7 @@ app.post("/submit-api-key", async (c) => {
 function renderApiKeyForm(
   stateToken: string,
   extraHeaders: Record<string, string> = {},
+  error?: string,
 ): Response {
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -239,6 +248,16 @@ function renderApiKeyForm(
 		.help a {
 			color: #0070f3;
 		}
+		.error {
+			background: #fef2f2;
+			border: 1px solid #fecaca;
+			color: #dc2626;
+			padding: 0.75rem;
+			border-radius: 6px;
+			font-size: 0.9rem;
+			margin-bottom: 0.5rem;
+			text-align: center;
+		}
 	</style>
 </head>
 <body>
@@ -246,6 +265,7 @@ function renderApiKeyForm(
 		<div class="card">
 			<h1>Rephonic MCP Server</h1>
 			<p>Enter your Rephonic API key to connect. You can find it on your <a href="https://rephonic.com/account/settings">account page</a>.</p>
+			${error ? `<div class="error">${error}</div>` : ""}
 			<form method="post" action="/submit-api-key">
 				<input type="hidden" name="state" value="${stateToken}">
 				<label for="api_key">API Key</label>
