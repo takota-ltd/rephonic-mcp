@@ -72,9 +72,8 @@ Add to your project's `.mcp.json`:
 Go to **Settings** → **MCP** → **Add new MCP server**. Set type to **URL** and enter `https://mcp.rephonic.com`.
 
 ---
-
 <details>
-<summary><h2>Development</h2></summary>
+<summary><h3>Development</h3></summary>
 
 If you want to fork or customize this MCP server for your own needs, here is how you can run or deploy it.
 
@@ -111,9 +110,8 @@ npm run cf-typegen
 ```
 
 </details>
-
 <details>
-<summary><h2>Deployment</h2></summary>
+<summary><h3>Deployment</h3></summary>
 
 ### First-time setup
 
@@ -142,5 +140,4 @@ npm run cf-typegen
 ```bash
 npm run deploy
 ```
-
 </details>
