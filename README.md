@@ -17,7 +17,31 @@ This is a remote Model Context Protocol (MCP) server that connects AI assistants
 
 ## Tools
 
-- **lookup_podcast** — Look up a podcast's metadata, chart rankings, and latest episodes by its Rephonic ID (e.g. `huberman-lab`).
+- **search_podcasts** — Search for podcasts by topic, title, or publisher with advanced filters.
+- **search_episodes** — Search for episodes by keyword across titles, show notes, and transcripts.
+- **autocomplete** — Get suggested keywords and matching podcasts for a search query.
+- **lookup_podcast** — Look up a podcast's metadata, chart rankings, and latest episodes by its Rephonic ID.
+- **podcast_people** — Get hosts and guests of a podcast with contact details and social profiles.
+- **podcast_demographics** — Get estimated listener demographics (age, education, profession, income, location).
+- **podcast_promotions** — Get sponsors and cross-promotions from a podcast's episodes.
+- **list_episodes** — List all episodes for a podcast in chronological order.
+- **get_episode** — Look up metadata for an individual episode.
+- **episode_transcript** — Get the full transcript for an episode.
+- **contacts** — Get email contacts, contact pages, and social accounts for a podcast.
+- **social_accounts** — Get social media accounts linked to a podcast with follower/engagement metrics.
+- **feedback** — Get overall ratings and AI-generated review summaries for a podcast.
+- **reviews** — Get individual listener reviews from various apps.
+- **trends** — Get historical trends for podcast metrics over time.
+- **shared_audience_graph** — Get podcasts with overlapping listeners.
+- **chart_categories** — List available chart categories and countries for Apple, Spotify, or YouTube.
+- **chart_rankings** — Get the latest chart rankings for a platform, country, and category.
+- **list_categories** — List podcast categories (for use with search filters).
+- **list_countries** — List countries (for use with search filters).
+- **list_languages** — List languages (for use with search filters).
+- **list_sponsors** — List commonly seen sponsors (for use with search filters).
+- **list_professions** — List common listener professions (for use with search filters).
+- **list_interests** — List common listener interests (for use with search filters).
+- **api_quota** — Check your API request quota and usage.
 
 ## Setup
 
