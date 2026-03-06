@@ -25,15 +25,17 @@ You need a Rephonic API key. [Get one here](https://rephonic.com/developers).
 
 ### ChatGPT
 
-1. Go to **Settings** → **Connected apps** → **Add MCP Server**
-2. Enter `https://mcp.rephonic.com`
-3. Click **Connect** and enter your Rephonic API key when prompted
+1. Go to **Settings** → **Apps** → **Advanced settings** and enable **Developer mode**
+2. Then click **Create app**
+3. Enter Name: Rephonic
+4. Enter MCP Server URL: `https://mcp.rephonic.com`
+3. Click **Create** and enter your Rephonic API key when prompted
 
 ### Claude.ai
 
-1. Go to **Settings** → **Integrations**
-2. Click **Add More** and enter `https://mcp.rephonic.com`
-3. Click **Connect** and enter your Rephonic API key when prompted
+1. Go to **Settings** → **Connectors**
+2. Click **Add custom connector** and enter name `Rephonic` and MCP server URL `https://mcp.rephonic.com`
+3. Click **Add** and enter your Rephonic API key when prompted
 
 ### Claude Desktop
 
